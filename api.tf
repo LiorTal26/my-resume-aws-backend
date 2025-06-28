@@ -1,6 +1,3 @@
-#############################################################################
-#  HTTP API  →  Lambda visitor counter
-#############################################################################
 
 # -------- HTTP API --------------------------------------------------
 resource "aws_apigatewayv2_api" "http_api" {
@@ -43,7 +40,7 @@ resource "aws_apigatewayv2_stage" "default" {
 
 # -------- Lambda permissions ---------------------------------------
 resource "aws_lambda_permission" "api_invoke_get" {
-  statement_id  = "AllowAPIGwv2GET"
+  statement_id  = "AllowAPIG-${aws_apigatewayv2_api.http_api.id}-GET"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.visitor_fn.function_name
   principal     = "apigateway.amazonaws.com"
@@ -51,17 +48,14 @@ resource "aws_lambda_permission" "api_invoke_get" {
 }
 
 resource "aws_lambda_permission" "api_invoke_post" {
-  statement_id  = "AllowAPIGwv2POST"
+  statement_id  = "AllowAPIG-${aws_apigatewayv2_api.http_api.id}-POST"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.visitor_fn.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/POST/visitors"
 }
 
-#############################################################################
 #  NEW — Custom domain for the API  (api.lior-cv.tal-handassa.com)
-#############################################################################
-
 resource "aws_apigatewayv2_domain_name" "api_domain" {
   domain_name = "${var.api_sub}.${var.domain_root}" # api.lior-cv.tal-handassa.com
 
@@ -72,27 +66,10 @@ resource "aws_apigatewayv2_domain_name" "api_domain" {
   }
 }
 
-# Map the HTTP API’s default stage to the custom domain
+# Map the HTTP API default stage to the custom domain
 resource "aws_apigatewayv2_api_mapping" "api_map" {
   api_id      = aws_apigatewayv2_api.http_api.id
   domain_name = aws_apigatewayv2_domain_name.api_domain.id
   stage       = "$default"
 }
 
-# -------- Route 53 alias record ------------------------------------
-# data "aws_route53_zone" "root" {
-#   name         = var.domain_root # tal-handassa.com
-#   private_zone = false
-# }
-
-# resource "aws_route53_record" "api_alias" {
-#   zone_id = data.aws_route53_zone.root.zone_id
-#   name    = "${var.api_sub}.${var.domain_root}" # api.lior-cv.tal-handassa.com
-#   type    = "A"
-
-#   alias {
-#     name                   = aws_apigatewayv2_domain_name.api_domain.domain_name_configuration[0].target_domain_name
-#     zone_id                = aws_apigatewayv2_domain_name.api_domain.domain_name_configuration[0].hosted_zone_id
-#     evaluate_target_health = false
-#   }
-# }

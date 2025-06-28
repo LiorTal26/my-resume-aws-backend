@@ -1,6 +1,4 @@
-#############################################################################
-# Résumé  →  CloudFront  (lior-cv.tal-handassa.com)
-#############################################################################
+# resume  =>  CloudFront  (lior-cv.tal-handassa.com)
 resource "aws_route53_record" "site_alias" {
   zone_id = data.aws_route53_zone.root.zone_id
   name    = "${var.site_sub}.${var.domain_root}"
@@ -24,9 +22,7 @@ resource "aws_route53_record" "site_alias_ipv6" {
   }
 }
 
-#############################################################################
-# API  →  API Gateway custom domain  (api.lior-cv.tal-handassa.com)
-#############################################################################
+# API  =>  API Gateway custom domain  (api.lior-cv.tal-handassa.com)
 resource "aws_route53_record" "api_alias" {
   zone_id = data.aws_route53_zone.root.zone_id
   name    = "${var.api_sub}.${var.domain_root}"

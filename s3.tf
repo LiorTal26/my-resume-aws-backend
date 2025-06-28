@@ -1,13 +1,7 @@
-#############################################################################
-#  Provider (unchanged)
-#############################################################################
 provider "aws" {
   region = var.aws_region
 }
 
-#############################################################################
-#  S3 bucket (static site)  – unchanged blocks
-#############################################################################
 resource "aws_s3_bucket" "static_site" {
   bucket        = var.aws_s3_bucket_name
   force_destroy = true
@@ -55,36 +49,35 @@ resource "aws_s3_bucket_policy" "public_read" {
   })
 }
 
-#############################################################################
-#  Upload every static file except templates (*.tmpl)
-#############################################################################
-resource "aws_s3_object" "site_files" {
-  for_each = {
-    for f in fileset("${path.module}/static", "**") :
-    f => f
-    if !endswith(f, ".tmpl") # <-- skip template files
-  }
+# uncomment this block to upload static files to the S3 bucket without the frontend module
 
-  bucket = aws_s3_bucket.static_site.id
-  key    = each.value
-  source = "${path.module}/static/${each.value}"
-  etag   = filemd5("${path.module}/static/${each.value}")
+# resource "aws_s3_object" "site_files" {
+#   for_each = {
+#     for f in fileset("${path.module}/static", "**") :
+#     f => f
+#     if !endswith(f, ".tmpl") # <-- skip template files
+#   }
 
-  content_type = lookup(
-    {
-      html = "text/html"
-      css  = "text/css"
-      js   = "application/javascript"
-      png  = "image/png"
-      jpg  = "image/jpeg"
-      jpeg = "image/jpeg"
-      svg  = "image/svg+xml"
-      ico  = "image/x-icon"
-    },
-    lower(element(split(".", each.value), length(split(".", each.value)) - 1)),
-    "application/octet-stream"
-  )
+#   bucket = aws_s3_bucket.static_site.id
+#   key    = each.value
+#   source = "${path.module}/static/${each.value}"
+#   etag   = filemd5("${path.module}/static/${each.value}")
 
-  # 1-minute TTL so CloudFront auto-refreshes (no manual invalidations)
-  cache_control = "max-age=60, must-revalidate"
-}
+#   content_type = lookup(
+#     {
+#       html = "text/html"
+#       css  = "text/css"
+#       js   = "application/javascript"
+#       png  = "image/png"
+#       jpg  = "image/jpeg"
+#       jpeg = "image/jpeg"
+#       svg  = "image/svg+xml"
+#       ico  = "image/x-icon"
+#     },
+#     lower(element(split(".", each.value), length(split(".", each.value)) - 1)),
+#     "application/octet-stream"
+#   )
+
+#   # 1-minute TTL so CloudFront auto-refreshes (no manual invalidations)
+#   cache_control = "max-age=60, must-revalidate"
+# }

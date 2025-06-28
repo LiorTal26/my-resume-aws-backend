@@ -23,7 +23,22 @@ output "ddb_table_name" {
 }
 
 
+output "static_bucket_name" {
+  value       = aws_s3_bucket.static_site.bucket
+  description = "Name of the website bucket"
+}
+
+output "cloudfront_dist_id" {
+  value       = aws_cloudfront_distribution.cdn.id
+  description = "CloudFront distribution ID"
+}
+
 output "cloud_resume_challenge_aws" {
   value       = "https://cloudresumechallenge.dev/docs/the-challenge/aws/"
   description = "Link to the Cloud Resume Challenge AWS documentation"
+}
+
+output "final_resume_url" {
+  value       = "https://${var.site_sub}.${var.domain_root}"
+  description = "Final URL of the résumé site"
 }

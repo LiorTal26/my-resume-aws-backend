@@ -1,15 +1,11 @@
-#############################################################################
-# 0. Provider alias for us-east-1  (required by CloudFront)
-#############################################################################
+#  Provider alias for us-east-1 required by CloudFront
 provider "aws" {
   alias  = "useast1"
   region = "us-east-1"
 }
 
-#############################################################################
-# 1. Certificates
-#############################################################################
-# us-east-1  →  CloudFront alias  (lior-cv.tal-handassa.com)
+# Certificates
+# us-east-1  =>  CloudFront alias  (lior-cv.tal-handassa.com)
 resource "aws_acm_certificate" "site_cert" {
   provider          = aws.useast1
   domain_name       = "${var.site_sub}.${var.domain_root}"
@@ -24,9 +20,7 @@ resource "aws_acm_certificate" "api_cert" {
   lifecycle { create_before_destroy = true }
 }
 
-#############################################################################
 # 2. DNS validation records (one per cert)
-#############################################################################
 data "aws_route53_zone" "root" {
   name         = var.domain_root # tal-handassa.com
   private_zone = false
@@ -56,9 +50,8 @@ resource "aws_route53_record" "api_cert_validation" {
   records = [local.api_dvo.resource_record_value]
 }
 
-#############################################################################
-# 3. Certificate validations
-#############################################################################
+
+# Certificate validations
 resource "aws_acm_certificate_validation" "site_validate" {
   provider                = aws.useast1
   certificate_arn         = aws_acm_certificate.site_cert.arn

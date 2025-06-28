@@ -1,47 +1,66 @@
-# -------------------------------------------------------------------
-#  Package Lambda code → lambda.zip
-# -------------------------------------------------------------------
+# Zip up the handler
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_file = "${path.module}/lambda_src/lambda_function.py"
   output_path = "${path.module}/lambda.zip"
 }
 
-# -------------------------------------------------------------------
-#  Re-use existing IAM role
-# -------------------------------------------------------------------
-data "aws_iam_role" "lambda_role" {
-  name = "lambda-resume" # or "service-role/lambda-resume"
+#   IAM role + policies
+data "aws_iam_policy_document" "assume_lambda" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
 }
 
-resource "aws_iam_role_policy" "ddb_access" {
-  role = data.aws_iam_role.lambda_role.id
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect   = "Allow",
-      Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem"],
-      Resource = aws_dynamodb_table.counter.arn # <— still references the table
-    }]
-  })
+resource "aws_iam_role" "lambda_role" {
+  name               = "resume-counter-role"
+  description        = "Exec role for resume-counter Lambda"
+  assume_role_policy = data.aws_iam_policy_document.assume_lambda.json
+
+  lifecycle { create_before_destroy = true }
 }
 
+# CloudWatch Logs
 resource "aws_iam_role_policy_attachment" "basic_exec" {
-  role       = data.aws_iam_role.lambda_role.id
+  role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# -------------------------------------------------------------------
-#  Lambda function
-# -------------------------------------------------------------------
+# DynamoDB read/write for the counter table
+data "aws_iam_policy_document" "ddb_access" {
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:UpdateItem"]
+    resources = [aws_dynamodb_table.counter.arn]
+  }
+}
+
+resource "aws_iam_policy" "ddb_policy" {
+  name        = "resume-counter-ddb-policy"
+  policy      = data.aws_iam_policy_document.ddb_access.json
+  description = "Allow Lambda to read/update visitor counter table"
+}
+
+resource "aws_iam_role_policy_attachment" "ddb_attach" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.ddb_policy.arn
+}
+
+#  2.  Lambda function
 resource "aws_lambda_function" "visitor_fn" {
-  function_name = var.lambda_name
-  role          = data.aws_iam_role.lambda_role.arn
+  function_name = var.lambda_name                  # "resume-counter"
+  role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.12"
   handler       = "lambda_function.lambda_handler"
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  memory_size = 128
+  timeout     = 5
 
   environment {
     variables = {
@@ -49,8 +68,18 @@ resource "aws_lambda_function" "visitor_fn" {
     }
   }
 
+  publish = true
+
   depends_on = [
-    data.archive_file.lambda_zip,
-    aws_iam_role_policy.ddb_access
+    aws_iam_role_policy_attachment.basic_exec,
+    aws_iam_role_policy_attachment.ddb_attach,
   ]
 }
+
+#  3.  (Optional) Stable alias “live” that always points to the newest version
+resource "aws_lambda_alias" "live" {
+  name             = "live"
+  function_name    = aws_lambda_function.visitor_fn.function_name
+  function_version = aws_lambda_function.visitor_fn.version
+}
+

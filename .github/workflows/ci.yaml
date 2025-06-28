@@ -1,0 +1,114 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main ]          # run on direct pushes
+  pull_request:
+    branches: [ main ]          # run on PRs
+  workflow_dispatch:            # manual trigger
+
+permissions:
+  id-token: write               # OIDC → AWS
+  contents: read                # checkout repo
+  pull-requests: write          # comment plan
+
+env:
+  TF_VERSION: "1.8.5"
+
+jobs:
+# ────────────────────────────────────────────────────────────────────────
+#  1.  Build, test, and plan (always)
+# ────────────────────────────────────────────────────────────────────────
+  build-test-plan:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+    steps:
+    # ── Checkout code ──────────────────────────────────────────────────
+    - uses: actions/checkout@v4
+
+    # ── Python unit tests ──────────────────────────────────────────────
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dev dependencies & run tests
+      run: |
+        pip install pytest
+        pytest -q
+
+    # ── Package Lambda (lambda.zip) ────────────────────────────────────
+    - name: Build lambda.zip
+      run: |
+        cd lambda_src
+        zip -q -r ../lambda.zip lambda_function.py
+        cd ..
+
+    # ── AWS creds via OIDC ────────────────────────────────────────────
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.ROLE_ARN }}
+        aws-region:     ${{ env.AWS_REGION }}
+
+    # ── Terraform init / fmt / validate / plan ────────────────────────
+    - uses: hashicorp/setup-terraform@v3
+      with: { terraform_version: ${{ env.TF_VERSION }} }
+
+    - run: terraform init -input=false
+
+    - run: terraform fmt -check
+    - run: terraform validate
+
+    - name: Terraform plan
+      id: plan
+      run: |
+        terraform plan -no-color -out=tfplan
+        terraform show -no-color tfplan > tfplan.txt
+
+    # Save the plan file (handy for debugging)
+    - name: Upload tfplan artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan
+        path: tfplan.txt
+        retention-days: 3
+
+    # Comment plan on PRs
+    - name: Comment plan on PR
+      if: github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        message: |
+          **Terraform plan**
+          ```
+          ${{ steps.plan.outputs.stdout }}
+          ```
+
+# ────────────────────────────────────────────────────────────────────────
+#  2.  Apply (only on pushes to main)
+# ────────────────────────────────────────────────────────────────────────
+  apply:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-test-plan
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.ROLE_ARN }}
+        aws-region:     ${{ env.AWS_REGION }}
+
+    - uses: hashicorp/setup-terraform@v3
+      with: { terraform_version: ${{ env.TF_VERSION }} }
+
+    - run: terraform init -input=false
+    - run: terraform apply -auto-approve
