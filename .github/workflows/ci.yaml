@@ -31,7 +31,7 @@ jobs:
 
     - name: Install dev deps & run tests
       run: |
-        pip install pytest
+        pip install pytest boto3
         export PYTHONPATH="$PYTHONPATH:${GITHUB_WORKSPACE}/lambda_src"
         pytest -q
 
