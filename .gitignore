@@ -2,3 +2,4 @@
 *.tfstate*
 .terraform.lock.hcl
 lambda.zip
+tf_state_access.json
