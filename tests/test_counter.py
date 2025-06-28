@@ -1,22 +1,38 @@
 # tests/test_counter.py
 import os
-from unittest.mock import MagicMock, patch
-from lambda_src.lambda_function import lambda_handler
+from unittest.mock import patch, MagicMock
+import importlib
 
 
-def dummy_table():
-    """Returns an object that pretends to be a DynamoDB table."""
-    store = {"id": "counter", "count": 0}
+def _fake_table():
+    """Very small in-memory stub that looks like a DynamoDB table."""
+    store = {"count": 0}
 
-    class _Table:
+    class _T:
         def get_item(self, Key):
-            return {"Item": store}
+            return {"Item": {"count": store["count"]}}
 
         def update_item(self, **kwargs):
             store["count"] += 1
-            return {"Attributes": store}
+            return {"Attributes": {"count": store["count"]}}
 
-    return _Table()
+    return _T()
+
+
+def _load_handler(monkeypatch):
+    """Patch boto3, then import the Lambda module and return its handler."""
+    fake_boto3 = MagicMock()
+    fake_boto3.resource.return_value.Table.return_value = _fake_table()
+
+    monkeypatch.setitem(
+        importlib.import_module("sys").modules,  # sys.modules
+        "boto3",
+        fake_boto3,
+    )
+
+    # Now import *after* the patch so the module sees our fake boto3
+    mod = importlib.import_module("lambda_function")
+    return mod.lambda_handler
 
 
 def test_env_set(monkeypatch):
@@ -24,25 +40,22 @@ def test_env_set(monkeypatch):
     assert "TABLE_NAME" in os.environ
 
 
-@patch("lambda_src.lambda_function.boto3")
-def test_counter_returns_dict(mock_boto3, monkeypatch):
+def test_counter_get(monkeypatch):
     monkeypatch.setenv("TABLE_NAME", "dummy_table")
-    # stub boto3.resource("dynamodb").Table(...)
-    mock_boto3.resource.return_value.Table.return_value = dummy_table()
+    handler = _load_handler(monkeypatch)
 
     event = {"requestContext": {"http": {"method": "GET"}}}
-    result = lambda_handler(event, None)
+    res = handler(event, None)
 
-    assert isinstance(result, dict)
-    assert "visitors" in result
+    assert isinstance(res, dict)
+    assert res["visitors"] == 0
 
 
-@patch("lambda_src.lambda_function.boto3")
-def test_counter_post(mock_boto3, monkeypatch):
+def test_counter_post(monkeypatch):
     monkeypatch.setenv("TABLE_NAME", "dummy_table")
-    mock_boto3.resource.return_value.Table.return_value = dummy_table()
+    handler = _load_handler(monkeypatch)
 
     event = {"requestContext": {"http": {"method": "POST"}}}
-    res = lambda_handler(event, None)
+    res = handler(event, None)
 
-    assert res["visitors"] >= 1
+    assert res["visitors"] == 1        # first increment works
