@@ -32,6 +32,7 @@ jobs:
     - name: Install dev deps & run tests
       run: |
         pip install pytest
+        export PYTHONPATH="$PYTHONPATH:${GITHUB_WORKSPACE}/lambda_src"
         pytest -q
 
     - name: Build lambda.zip
