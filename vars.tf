@@ -1,4 +1,4 @@
-variable "aws_region" { default = "il-central-1" }                   
+variable "aws_region" { default = "il-central-1" }
 variable "aws_s3_bucket_name" { default = "my-resume-site-lior-il" } # static bucket
 variable "ddb_table_name" { default = "resume_visitors" }            # DynamoDB table
 variable "lambda_name" { default = "resume-counter" }                # Lambda fn

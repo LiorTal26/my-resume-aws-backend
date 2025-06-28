@@ -14,11 +14,11 @@ resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   default_root_object = "index.html"
 
- 
+
   aliases = ["${var.site_sub}.${var.domain_root}"] # lior-cv.tal-handassa.com
 
   origin {
-    domain_name = local.s3_origin_domain 
+    domain_name = local.s3_origin_domain
     origin_id   = "s3StaticSite"
 
     origin_access_control_id = aws_cloudfront_origin_access_control.oac.id

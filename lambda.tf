@@ -51,7 +51,7 @@ resource "aws_iam_role_policy_attachment" "ddb_attach" {
 
 #  2.  Lambda function
 resource "aws_lambda_function" "visitor_fn" {
-  function_name = var.lambda_name                  # "resume-counter"
+  function_name = var.lambda_name # "resume-counter"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.12"
   handler       = "lambda_function.lambda_handler"
