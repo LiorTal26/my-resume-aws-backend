@@ -19,8 +19,6 @@ jobs:
 # ────────────────────────── build / test / plan ──────────────────────────
   build-test-plan:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
     - uses: actions/checkout@v4
@@ -45,7 +43,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.ROLE_ARN }}
-        aws-region:     ${{ env.AWS_REGION }}
+        aws-region:     ${{ secrets.AWS_REGION }}
 
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3
@@ -85,8 +83,6 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-test-plan
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
     - uses: actions/checkout@v4
@@ -95,7 +91,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.ROLE_ARN }}
-        aws-region:     ${{ env.AWS_REGION }}
+        aws-region:     ${{ secrets.AWS_REGION }}
 
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v3

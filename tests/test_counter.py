@@ -1,11 +1,11 @@
-# tests/test_counter.py
+import json
 import os
-from unittest.mock import patch, MagicMock
 import importlib
+from unittest.mock import MagicMock
+import pytest
 
 
 def _fake_table():
-    """Very small in-memory stub that looks like a DynamoDB table."""
     store = {"count": 0}
 
     class _T:
@@ -19,20 +19,25 @@ def _fake_table():
     return _T()
 
 
+
 def _load_handler(monkeypatch):
-    """Patch boto3, then import the Lambda module and return its handler."""
     fake_boto3 = MagicMock()
     fake_boto3.resource.return_value.Table.return_value = _fake_table()
 
-    monkeypatch.setitem(
-        importlib.import_module("sys").modules,  # sys.modules
-        "boto3",
-        fake_boto3,
-    )
+    
+    monkeypatch.setitem(importlib.import_module("sys").modules, "boto3", fake_boto3)
 
-    # Now import *after* the patch so the module sees our fake boto3
     mod = importlib.import_module("lambda_function")
+    importlib.reload(mod)                 
     return mod.lambda_handler
+
+
+
+def _extract_count(resp: dict) -> int:
+    if "visitors" in resp:                # old shape
+        return resp["visitors"]
+    return json.loads(resp["body"])["visitors"]
+
 
 
 def test_env_set(monkeypatch):
@@ -48,7 +53,7 @@ def test_counter_get(monkeypatch):
     res = handler(event, None)
 
     assert isinstance(res, dict)
-    assert res["visitors"] == 0
+    assert _extract_count(res) == 0
 
 
 def test_counter_post(monkeypatch):
@@ -58,4 +63,4 @@ def test_counter_post(monkeypatch):
     event = {"requestContext": {"http": {"method": "POST"}}}
     res = handler(event, None)
 
-    assert res["visitors"] == 1        # first increment works
+    assert _extract_count(res) == 1        # first increment
