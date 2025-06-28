@@ -6,7 +6,7 @@ resource "aws_s3_bucket" "static_site" {
   bucket        = var.aws_s3_bucket_name
   force_destroy = true
 }
-
+ 
 resource "aws_s3_bucket_ownership_controls" "owner" {
   bucket = aws_s3_bucket.static_site.id
   rule { object_ownership = "BucketOwnerPreferred" }
